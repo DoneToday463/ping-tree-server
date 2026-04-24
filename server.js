@@ -6,6 +6,7 @@ const app = express();
 app.use(express.json());
 app.use(cors());
 
+// TEST BUYERS
 let buyers = [
   {
     id: 1,
@@ -15,7 +16,19 @@ let buyers = [
     priority: 1,
     timeout_ms: 800,
     daily_cap: 100,
-    current_count: 0
+    current_count: 0,
+    payout: 25
+  },
+  {
+    id: 2,
+    name: "Test Buyer B",
+    api_url: "PASTE_SECOND_WEBHOOK_URL_HERE",
+    is_active: true,
+    priority: 2,
+    timeout_ms: 800,
+    daily_cap: 100,
+    current_count: 0,
+    payout: 20
   }
 ];
 
@@ -27,14 +40,14 @@ function getActiveBuyers() {
 
 async function sendPing(buyer, data) {
   try {
-    const res = await axios.post(buyer.api_url, data, {
+    await axios.post(buyer.api_url, data, {
       timeout: buyer.timeout_ms
     });
 
- return {
-  accepted: true,
-  payout: 25
-};
+    return {
+      accepted: true,
+      payout: buyer.payout
+    };
   } catch (err) {
     console.log(`Ping failed for ${buyer.name}:`, err.message);
     return { accepted: false, payout: 0 };
@@ -46,6 +59,7 @@ async function sendPost(buyer, data) {
     await axios.post(buyer.api_url, data, {
       timeout: buyer.timeout_ms
     });
+
     return true;
   } catch (err) {
     console.log(`Post failed for ${buyer.name}:`, err.message);
@@ -54,7 +68,10 @@ async function sendPost(buyer, data) {
 }
 
 app.get("/", (req, res) => {
-  res.json({ status: "Ping tree server is running" });
+  res.json({
+    status: "Ping tree server is running",
+    buyers
+  });
 });
 
 app.post("/api/lead", async (req, res) => {
@@ -69,31 +86,46 @@ app.post("/api/lead", async (req, res) => {
 
   const activeBuyers = getActiveBuyers();
   let winner = null;
+  let winningPing = null;
+  let pingLog = [];
 
   for (const buyer of activeBuyers) {
-    const pingResponse = await sendPing(buyer, {
+    const pingData = {
       postcode: data.postcode,
       loan_amount: data.loan_amount
+    };
+
+    const pingResponse = await sendPing(buyer, pingData);
+
+    pingLog.push({
+      buyer: buyer.name,
+      accepted: pingResponse.accepted,
+      payout: pingResponse.payout
     });
 
     if (pingResponse.accepted) {
       winner = buyer;
+      winningPing = pingResponse;
       buyer.current_count += 1;
       break;
     }
   }
 
   if (winner) {
-    await sendPost(winner, data);
+    const posted = await sendPost(winner, data);
 
     return res.json({
       status: "accepted",
-      buyer: winner.name
+      buyer: winner.name,
+      payout: winningPing.payout,
+      posted,
+      ping_log: pingLog
     });
   }
 
   return res.json({
-    status: "rejected"
+    status: "rejected",
+    ping_log: pingLog
   });
 });
 
