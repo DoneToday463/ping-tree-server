@@ -12,7 +12,7 @@ let buyers = [
     id: 1,
     name: "Test Buyer A",
     api_url: "https://webhook.site/7f50c212-a9b0-4ec4-94a3-62d1b871d051",
-    is_active: true,
+    is_active: false,
     priority: 1,
     timeout_ms: 800,
     daily_cap: 100,
