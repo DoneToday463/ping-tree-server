@@ -12,12 +12,13 @@ let buyers = [
     id: 1,
     name: "Test Buyer A",
     api_url: "https://webhook.site/7f50c212-a9b0-4ec4-94a3-62d1b871d051",
-    is_active: false,
+    is_active: true,
     priority: 1,
     timeout_ms: 800,
     daily_cap: 100,
     current_count: 0,
-    payout: 25
+    payout: 25,
+    min_loan_amount: 6000
   },
   {
     id: 2,
@@ -28,7 +29,8 @@ let buyers = [
     timeout_ms: 800,
     daily_cap: 100,
     current_count: 0,
-    payout: 20
+    payout: 20,
+    min_loan_amount: 4000
   }
 ];
 
@@ -44,13 +46,21 @@ async function sendPing(buyer, data) {
       timeout: buyer.timeout_ms
     });
 
+    const accepted = Number(data.loan_amount) >= buyer.min_loan_amount;
+
     return {
-      accepted: true,
-      payout: buyer.payout
+      accepted,
+      payout: accepted ? buyer.payout : 0,
+      reason: accepted
+        ? "Accepted by buyer rule"
+        : `Rejected: loan amount below ${buyer.min_loan_amount}`
     };
   } catch (err) {
-    console.log(`Ping failed for ${buyer.name}:`, err.message);
-    return { accepted: false, payout: 0 };
+    return {
+      accepted: false,
+      payout: 0,
+      reason: `Ping failed: ${err.message}`
+    };
   }
 }
 
@@ -85,46 +95,46 @@ app.post("/api/lead", async (req, res) => {
   }
 
   const activeBuyers = getActiveBuyers();
-  let winner = null;
-  let winningPing = null;
+
+  const pingData = {
+    postcode: data.postcode,
+    loan_amount: data.loan_amount
+  };
+
   let pingLog = [];
 
   for (const buyer of activeBuyers) {
-    const pingData = {
-      postcode: data.postcode,
-      loan_amount: data.loan_amount
-    };
-
     const pingResponse = await sendPing(buyer, pingData);
 
     pingLog.push({
       buyer: buyer.name,
       accepted: pingResponse.accepted,
-      payout: pingResponse.payout
+      payout: pingResponse.payout,
+      reason: pingResponse.reason
     });
-
-    if (pingResponse.accepted) {
-      winner = buyer;
-      winningPing = pingResponse;
-      buyer.current_count += 1;
-      break;
-    }
   }
 
-  if (winner) {
-    const posted = await sendPost(winner, data);
+  const acceptedBuyers = pingLog.filter(p => p.accepted);
 
+  if (acceptedBuyers.length === 0) {
     return res.json({
-      status: "accepted",
-      buyer: winner.name,
-      payout: winningPing.payout,
-      posted,
+      status: "rejected",
       ping_log: pingLog
     });
   }
 
+  const winningPing = acceptedBuyers.sort((a, b) => b.payout - a.payout)[0];
+  const winner = buyers.find(b => b.name === winningPing.buyer);
+
+  winner.current_count += 1;
+
+  const posted = await sendPost(winner, data);
+
   return res.json({
-    status: "rejected",
+    status: "accepted",
+    buyer: winner.name,
+    payout: winningPing.payout,
+    posted,
     ping_log: pingLog
   });
 });
