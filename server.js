@@ -22,7 +22,7 @@ let buyers = [
   {
     id: 2,
     name: "Test Buyer B",
-    api_url: "PASTE_SECOND_WEBHOOK_URL_HERE",
+    api_url: "https://webhook.site/cf8dff0d-7f69-43f9-bc3d-c794f355f40b",
     is_active: true,
     priority: 2,
     timeout_ms: 800,
