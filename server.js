@@ -10,7 +10,7 @@ let buyers = [
   {
     id: 1,
     name: "Test Buyer A",
-    api_url: "https://example.com",
+    api_url: "https://webhook.site/7f50c212-a9b0-4ec4-94a3-62d1b871d051",
     is_active: true,
     priority: 1,
     timeout_ms: 800,
@@ -27,7 +27,7 @@ function getActiveBuyers() {
 
 async function sendPing(buyer, data) {
   try {
-    const res = await axios.post(`${buyer.api_url}/ping`, data, {
+    const res = await axios.post(buyer.api_url, data, {
       timeout: buyer.timeout_ms
     });
 
@@ -43,7 +43,7 @@ async function sendPing(buyer, data) {
 
 async function sendPost(buyer, data) {
   try {
-    await axios.post(`${buyer.api_url}/post`, data, {
+    await axios.post(buyer.api_url, data, {
       timeout: buyer.timeout_ms
     });
     return true;
