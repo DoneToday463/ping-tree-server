@@ -42,17 +42,27 @@ function getActiveBuyers() {
 
 async function sendPing(buyer, data) {
   try {
-    await axios.post(buyer.api_url, data, {
+    const response = await axios.post(buyer.api_url, data, {
       timeout: buyer.timeout_ms
     });
 
+    // If a real buyer sends back accepted/payout, use that
+    if (response.data && typeof response.data.accepted === "boolean") {
+      return {
+        accepted: response.data.accepted,
+        payout: response.data.accepted ? Number(response.data.payout || buyer.payout) : 0,
+        reason: "Accepted/rejected by buyer API response"
+      };
+    }
+
+    // Fallback test logic for Webhook.site
     const accepted = Number(data.loan_amount) >= buyer.min_loan_amount;
 
     return {
       accepted,
       payout: accepted ? buyer.payout : 0,
       reason: accepted
-        ? "Accepted by buyer rule"
+        ? "Accepted by fallback buyer rule"
         : `Rejected: loan amount below ${buyer.min_loan_amount}`
     };
   } catch (err) {
