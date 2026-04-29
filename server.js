@@ -11,7 +11,7 @@ let buyers = [
   {
     id: 1,
     name: "Test Buyer A",
-    api_url: "https://webhook.site/7f50c212-a9b0-4ec4-94a3-62d1b871d051",
+    api_url: "https://webhook.site/bffc1662-20ed-4afd-9eb0-3bd1e32a4577",
     is_active: true,
     priority: 1,
     timeout_ms: 800,
@@ -23,7 +23,7 @@ let buyers = [
   {
     id: 2,
     name: "Test Buyer B",
-    api_url: "https://webhook.site/cf8dff0d-7f69-43f9-bc3d-c794f355f40b",
+    api_url: "https://webhook.site/3d908d77-3117-4e95-95ee-b05461004f95",
     is_active: true,
     priority: 2,
     timeout_ms: 800,
