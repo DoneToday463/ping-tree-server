@@ -1,55 +1,86 @@
 const express = require("express");
 const axios = require("axios");
 const cors = require("cors");
+const { Pool } = require("pg");
 
 const app = express();
 app.use(express.json());
 app.use(cors());
 
-// TEST BUYERS
-let buyers = [
-  {
-    id: 1,
-    name: "Test Buyer A",
-    api_url: "https://webhook.site/bffc1662-20ed-4afd-9eb0-3bd1e32a4577",
-    is_active: true,
-    priority: 1,
-    timeout_ms: 800,
-    daily_cap: 100,
-    current_count: 0,
-    payout: 25,
-    min_loan_amount: 6000
-  },
-  {
-    id: 2,
-    name: "Test Buyer B",
-    api_url: "https://webhook.site/3d908d77-3117-4e95-95ee-b05461004f95",
-    is_active: true,
-    priority: 2,
-    timeout_ms: 800,
-    daily_cap: 100,
-    current_count: 0,
-    payout: 20,
-    min_loan_amount: 4000
-  },
-    {
-    id: 3,
-    name: "Test Buyer C",
-    api_url: "https://webhook.site/6a9269d6-cf72-4714-afde-d62a9d586e04",
-    is_active: true,
-    priority: 3,
-    timeout_ms: 800,
-    daily_cap: 100,
-    current_count: 0,
-    payout: 30,
-    min_loan_amount: 8000
-  }
-];
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false
+});
 
-function getActiveBuyers() {
-  return buyers
-    .filter(b => b.is_active && b.current_count < b.daily_cap)
-    .sort((a, b) => a.priority - b.priority);
+async function initDb() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS buyers (
+      id SERIAL PRIMARY KEY,
+      name TEXT NOT NULL,
+      api_url TEXT NOT NULL,
+      is_active BOOLEAN DEFAULT true,
+      priority INTEGER DEFAULT 1,
+      timeout_ms INTEGER DEFAULT 800,
+      daily_cap INTEGER DEFAULT 100,
+      current_count INTEGER DEFAULT 0,
+      payout NUMERIC DEFAULT 0,
+      min_loan_amount NUMERIC DEFAULT 0,
+      created_at TIMESTAMP DEFAULT NOW()
+    );
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS leads (
+      id SERIAL PRIMARY KEY,
+      affiliate_id TEXT,
+      buyer_id INTEGER,
+      status TEXT,
+      payout NUMERIC DEFAULT 0,
+      posted BOOLEAN DEFAULT false,
+      payload JSONB,
+      created_at TIMESTAMP DEFAULT NOW()
+    );
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS ping_logs (
+      id SERIAL PRIMARY KEY,
+      lead_id INTEGER,
+      buyer_id INTEGER,
+      buyer_name TEXT,
+      accepted BOOLEAN,
+      payout NUMERIC DEFAULT 0,
+      reason TEXT,
+      created_at TIMESTAMP DEFAULT NOW()
+    );
+  `);
+
+  const existing = await pool.query(`SELECT COUNT(*) FROM buyers;`);
+
+  if (Number(existing.rows[0].count) === 0) {
+    await pool.query(`
+      INSERT INTO buyers 
+      (name, api_url, is_active, priority, timeout_ms, daily_cap, current_count, payout, min_loan_amount)
+      VALUES
+      ('Test Buyer A', 'https://webhook.site/6a9269d6-cf72-4714-afde-d62a9d586e04', true, 1, 800, 100, 0, 25, 6000),
+      ('Test Buyer B', 'https://webhook.site/bffc1662-20ed-4afd-9eb0-3bd1e32a4577', true, 2, 800, 100, 0, 20, 4000),
+      ('Test Buyer C', 'https://webhook.site/3d908d77-3117-4e95-95ee-b05461004f95', true, 3, 800, 100, 0, 30, 8000);
+    `);
+  }
+
+  console.log("Database ready");
+}
+
+async function getActiveBuyers() {
+  const result = await pool.query(`
+    SELECT *
+    FROM buyers
+    WHERE is_active = true
+    AND current_count < daily_cap
+    ORDER BY priority ASC;
+  `);
+
+  return result.rows;
 }
 
 async function sendPing(buyer, data) {
@@ -58,7 +89,6 @@ async function sendPing(buyer, data) {
       timeout: buyer.timeout_ms
     });
 
-    // If a real buyer sends back accepted/payout, use that
     if (response.data && typeof response.data.accepted === "boolean") {
       return {
         accepted: response.data.accepted,
@@ -67,12 +97,11 @@ async function sendPing(buyer, data) {
       };
     }
 
-    // Fallback test logic for Webhook.site
-    const accepted = Number(data.loan_amount) >= buyer.min_loan_amount;
+    const accepted = Number(data.loan_amount) >= Number(buyer.min_loan_amount);
 
     return {
       accepted,
-      payout: accepted ? buyer.payout : 0,
+      payout: accepted ? Number(buyer.payout) : 0,
       reason: accepted
         ? "Accepted by fallback buyer rule"
         : `Rejected: loan amount below ${buyer.min_loan_amount}`
@@ -99,11 +128,88 @@ async function sendPost(buyer, data) {
   }
 }
 
-app.get("/", (req, res) => {
+app.get("/", async (req, res) => {
+  const buyers = await pool.query(`SELECT * FROM buyers ORDER BY priority ASC;`);
+
   res.json({
     status: "Ping tree server is running",
-    buyers
+    buyers: buyers.rows
   });
+});
+
+app.get("/admin/buyers", async (req, res) => {
+  const result = await pool.query(`SELECT * FROM buyers ORDER BY priority ASC;`);
+  res.json(result.rows);
+});
+
+app.post("/admin/buyers", async (req, res) => {
+  const {
+    name,
+    api_url,
+    is_active = true,
+    priority = 1,
+    timeout_ms = 800,
+    daily_cap = 100,
+    payout = 0,
+    min_loan_amount = 0
+  } = req.body;
+
+  const result = await pool.query(
+    `
+    INSERT INTO buyers
+    (name, api_url, is_active, priority, timeout_ms, daily_cap, payout, min_loan_amount)
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+    RETURNING *;
+    `,
+    [name, api_url, is_active, priority, timeout_ms, daily_cap, payout, min_loan_amount]
+  );
+
+  res.json(result.rows[0]);
+});
+
+app.patch("/admin/buyers/:id", async (req, res) => {
+  const { id } = req.params;
+  const fields = req.body;
+
+  const allowed = [
+    "name",
+    "api_url",
+    "is_active",
+    "priority",
+    "timeout_ms",
+    "daily_cap",
+    "current_count",
+    "payout",
+    "min_loan_amount"
+  ];
+
+  const updates = [];
+  const values = [];
+
+  Object.keys(fields).forEach((key) => {
+    if (allowed.includes(key)) {
+      values.push(fields[key]);
+      updates.push(`${key} = $${values.length}`);
+    }
+  });
+
+  if (updates.length === 0) {
+    return res.status(400).json({ error: "No valid fields to update" });
+  }
+
+  values.push(id);
+
+  const result = await pool.query(
+    `
+    UPDATE buyers
+    SET ${updates.join(", ")}
+    WHERE id = $${values.length}
+    RETURNING *;
+    `,
+    values
+  );
+
+  res.json(result.rows[0]);
 });
 
 app.post("/api/lead", async (req, res) => {
@@ -116,7 +222,18 @@ app.post("/api/lead", async (req, res) => {
     });
   }
 
-  const activeBuyers = getActiveBuyers();
+  const leadResult = await pool.query(
+    `
+    INSERT INTO leads (affiliate_id, status, payload)
+    VALUES ($1, $2, $3)
+    RETURNING *;
+    `,
+    [affiliate_id, "received", data]
+  );
+
+  const lead = leadResult.rows[0];
+
+  const activeBuyers = await getActiveBuyers();
 
   const pingData = {
     postcode: data.postcode,
@@ -128,7 +245,24 @@ app.post("/api/lead", async (req, res) => {
   for (const buyer of activeBuyers) {
     const pingResponse = await sendPing(buyer, pingData);
 
+    await pool.query(
+      `
+      INSERT INTO ping_logs
+      (lead_id, buyer_id, buyer_name, accepted, payout, reason)
+      VALUES ($1,$2,$3,$4,$5,$6);
+      `,
+      [
+        lead.id,
+        buyer.id,
+        buyer.name,
+        pingResponse.accepted,
+        pingResponse.payout,
+        pingResponse.reason
+      ]
+    );
+
     pingLog.push({
+      buyer_id: buyer.id,
       buyer: buyer.name,
       accepted: pingResponse.accepted,
       payout: pingResponse.payout,
@@ -139,21 +273,40 @@ app.post("/api/lead", async (req, res) => {
   const acceptedBuyers = pingLog.filter(p => p.accepted);
 
   if (acceptedBuyers.length === 0) {
+    await pool.query(
+      `UPDATE leads SET status = $1 WHERE id = $2;`,
+      ["rejected", lead.id]
+    );
+
     return res.json({
       status: "rejected",
+      lead_id: lead.id,
       ping_log: pingLog
     });
   }
 
   const winningPing = acceptedBuyers.sort((a, b) => b.payout - a.payout)[0];
-  const winner = buyers.find(b => b.name === winningPing.buyer);
+  const winner = activeBuyers.find(b => b.id === winningPing.buyer_id);
 
-  winner.current_count += 1;
+  await pool.query(
+    `UPDATE buyers SET current_count = current_count + 1 WHERE id = $1;`,
+    [winner.id]
+  );
 
   const posted = await sendPost(winner, data);
 
+  await pool.query(
+    `
+    UPDATE leads
+    SET status = $1, buyer_id = $2, payout = $3, posted = $4
+    WHERE id = $5;
+    `,
+    ["accepted", winner.id, winningPing.payout, posted, lead.id]
+  );
+
   return res.json({
     status: "accepted",
+    lead_id: lead.id,
     buyer: winner.name,
     payout: winningPing.payout,
     posted,
@@ -163,6 +316,13 @@ app.post("/api/lead", async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 
-app.listen(PORT, () => {
-  console.log(`Ping tree server running on port ${PORT}`);
-});
+initDb()
+  .then(() => {
+    app.listen(PORT, () => {
+      console.log(`Ping tree server running on port ${PORT}`);
+    });
+  })
+  .catch((err) => {
+    console.error("Database init failed:", err);
+    process.exit(1);
+  });
