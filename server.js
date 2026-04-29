@@ -211,7 +211,73 @@ app.patch("/admin/buyers/:id", async (req, res) => {
 
   res.json(result.rows[0]);
 });
+app.get("/admin/leads", async (req, res) => {
+  const result = await pool.query(`
+    SELECT
+      leads.id,
+      leads.affiliate_id,
+      leads.status,
+      leads.payout,
+      leads.posted,
+      leads.created_at,
+      buyers.name AS buyer_name,
+      leads.payload
+    FROM leads
+    LEFT JOIN buyers ON leads.buyer_id = buyers.id
+    ORDER BY leads.created_at DESC
+    LIMIT 100;
+  `);
 
+  res.json(result.rows);
+});
+
+app.get("/admin/leads/:id", async (req, res) => {
+  const { id } = req.params;
+
+  const leadResult = await pool.query(
+    `
+    SELECT
+      leads.id,
+      leads.affiliate_id,
+      leads.status,
+      leads.payout,
+      leads.posted,
+      leads.created_at,
+      buyers.name AS buyer_name,
+      leads.payload
+    FROM leads
+    LEFT JOIN buyers ON leads.buyer_id = buyers.id
+    WHERE leads.id = $1;
+    `,
+    [id]
+  );
+
+  const logsResult = await pool.query(
+    `
+    SELECT *
+    FROM ping_logs
+    WHERE lead_id = $1
+    ORDER BY created_at ASC;
+    `,
+    [id]
+  );
+
+  res.json({
+    lead: leadResult.rows[0] || null,
+    ping_logs: logsResult.rows
+  });
+});
+
+app.get("/admin/ping-logs", async (req, res) => {
+  const result = await pool.query(`
+    SELECT *
+    FROM ping_logs
+    ORDER BY created_at DESC
+    LIMIT 200;
+  `);
+
+  res.json(result.rows);
+});
 app.post("/api/lead", async (req, res) => {
   const { affiliate_id, data } = req.body;
 
