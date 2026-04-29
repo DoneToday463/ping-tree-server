@@ -31,6 +31,18 @@ let buyers = [
     current_count: 0,
     payout: 20,
     min_loan_amount: 4000
+  },
+    {
+    id: 3,
+    name: "Test Buyer C",
+    api_url: "https://webhook.site/6a9269d6-cf72-4714-afde-d62a9d586e04",
+    is_active: true,
+    priority: 3,
+    timeout_ms: 800,
+    daily_cap: 100,
+    current_count: 0,
+    payout: 30,
+    min_loan_amount: 8000
   }
 ];
 
