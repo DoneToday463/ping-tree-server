@@ -582,7 +582,7 @@ app.post("/api/lead", async (req, res) => {
 };
 
 if (req.query.redirect === "true" && winner.redirect_url) {
-  return res.redirect(winner.redirect_url);
+  return res.redirect(303, winner.redirect_url);
 }
 
 return res.json(responsePayload);
