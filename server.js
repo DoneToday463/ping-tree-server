@@ -214,16 +214,17 @@ app.post("/admin/buyers", async (req, res) => {
     daily_cap = 100,
     payout = 0,
     min_loan_amount = 0
+    redirect_url
   } = req.body;
 
   const result = await pool.query(
     `
     INSERT INTO buyers
-    (name, api_url, is_active, priority, timeout_ms, daily_cap, payout, min_loan_amount)
+    (name, api_url, is_active, priority, timeout_ms, daily_cap, payout, min_loan_amount, redirect_url)
     VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
     RETURNING *;
     `,
-    [name, api_url, is_active, priority, timeout_ms, daily_cap, payout, min_loan_amount]
+    [name, api_url, is_active, priority, timeout_ms, daily_cap, payout, min_loan_amount, redirect_url]
   );
 
   res.json(result.rows[0]);
@@ -242,7 +243,8 @@ app.patch("/admin/buyers/:id", async (req, res) => {
     "daily_cap",
     "current_count",
     "payout",
-    "min_loan_amount"
+    "min_loan_amount",
+    "redirect_url"
   ];
 
   const updates = [];
@@ -575,6 +577,7 @@ app.post("/api/lead", async (req, res) => {
     buyer: winner.name,
     payout: winningPing.payout,
     posted,
+    redirect_url: winner.redirect_url || null,
     ping_log: pingLog
   });
 });
