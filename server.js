@@ -430,7 +430,7 @@ app.get("/track/click", async (req, res) => {
   res.redirect(redirect_url);
 });
 app.post("/api/lead", async (req, res) => {
-  const { affiliate_id, data } = req.body;
+  const { affiliate_id, click_id, data } = req.body;
 
   if (!affiliate_id || !data) {
     return res.status(400).json({
@@ -445,7 +445,7 @@ app.post("/api/lead", async (req, res) => {
     VALUES ($1, $2, $3)
     RETURNING *;
     `,
-    [affiliate_id, "received", data]
+    [affiliate_id, "received", { ...data, click_id }]
   );
 
   const lead = leadResult.rows[0];
