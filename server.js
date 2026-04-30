@@ -335,6 +335,52 @@ app.get("/admin/ping-logs", async (req, res) => {
 
   res.json(result.rows);
 });
+app.get("/admin/affiliates", async (req, res) => {
+  const result = await pool.query(`SELECT * FROM affiliates ORDER BY id DESC;`);
+  res.json(result.rows);
+});
+
+app.post("/admin/affiliates", async (req, res) => {
+  const { name, email, api_key, is_active = true } = req.body;
+
+  const result = await pool.query(
+    `
+    INSERT INTO affiliates (name, email, api_key, is_active)
+    VALUES ($1, $2, $3, $4)
+    RETURNING *;
+    `,
+    [name, email, api_key, is_active]
+  );
+
+  res.json(result.rows[0]);
+});
+
+app.get("/admin/offers", async (req, res) => {
+  const result = await pool.query(`SELECT * FROM offers ORDER BY id DESC;`);
+  res.json(result.rows);
+});
+
+app.post("/admin/offers", async (req, res) => {
+  const {
+    name,
+    vertical,
+    slug,
+    is_active = true,
+    payout = 0,
+    landing_url
+  } = req.body;
+
+  const result = await pool.query(
+    `
+    INSERT INTO offers (name, vertical, slug, is_active, payout, landing_url)
+    VALUES ($1, $2, $3, $4, $5, $6)
+    RETURNING *;
+    `,
+    [name, vertical, slug, is_active, payout, landing_url]
+  );
+
+  res.json(result.rows[0]);
+});
 app.post("/api/lead", async (req, res) => {
   const { affiliate_id, data } = req.body;
 
