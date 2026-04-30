@@ -571,15 +571,21 @@ app.post("/api/lead", async (req, res) => {
     ["accepted", winner.id, winningPing.payout, posted, lead.id]
   );
 
-  return res.json({
-    status: "accepted",
-    lead_id: lead.id,
-    buyer: winner.name,
-    payout: winningPing.payout,
-    posted,
-    redirect_url: winner.redirect_url || null,
-    ping_log: pingLog
-  });
+  const responsePayload = {
+  status: "accepted",
+  lead_id: lead.id,
+  buyer: winner.name,
+  payout: winningPing.payout,
+  posted,
+  redirect_url: winner.redirect_url || null,
+  ping_log: pingLog
+};
+
+if (req.query.redirect === "true" && winner.redirect_url) {
+  return res.redirect(winner.redirect_url);
+}
+
+return res.json(responsePayload);
 });
 
 const PORT = process.env.PORT || 3000;
