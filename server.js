@@ -221,7 +221,7 @@ app.post("/admin/buyers", async (req, res) => {
     `
     INSERT INTO buyers
     (name, api_url, is_active, priority, timeout_ms, daily_cap, payout, min_loan_amount, redirect_url)
-    VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
     RETURNING *;
     `,
     [name, api_url, is_active, priority, timeout_ms, daily_cap, payout, min_loan_amount, redirect_url]
