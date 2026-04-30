@@ -213,7 +213,7 @@ app.post("/admin/buyers", async (req, res) => {
     timeout_ms = 800,
     daily_cap = 100,
     payout = 0,
-    min_loan_amount = 0
+    min_loan_amount = 0,
     redirect_url
   } = req.body;
 
