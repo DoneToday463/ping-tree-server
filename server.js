@@ -7,6 +7,10 @@ const app = express();
 app.use(express.json());
 app.use(cors());
 
+app.get("/ping", (req, res) => {
+  res.send("pong");
+});
+
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false
