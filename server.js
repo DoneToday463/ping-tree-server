@@ -479,6 +479,74 @@ app.get("/admin/affiliate-report", async (req, res) => {
 
   res.json(result.rows);
 });
+app.get("/test-form", (req, res) => {
+  const { aff_id = "1", click_id = "manual-test" } = req.query;
+
+  res.send(`
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <title>Test Lead Form</title>
+        <style>
+          body { font-family: Arial; max-width: 500px; margin: 40px auto; }
+          input, button { width: 100%; padding: 12px; margin: 8px 0; }
+          button { cursor: pointer; }
+        </style>
+      </head>
+      <body>
+        <h2>Test Lead Form</h2>
+
+        <form id="leadForm">
+          <input name="name" placeholder="Name" value="John Test" />
+          <input name="phone" placeholder="Phone" value="07123456789" />
+          <input name="postcode" placeholder="Postcode" value="GU1" />
+          <input name="loan_amount" placeholder="Loan Amount" value="7000" />
+          <button type="submit">Submit Lead</button>
+        </form>
+
+        <pre id="result"></pre>
+
+        <script>
+          const affId = "${aff_id}";
+          const clickId = "${click_id}";
+
+          document.getElementById("leadForm").addEventListener("submit", async function(e) {
+            e.preventDefault();
+
+            const form = new FormData(e.target);
+
+            const payload = {
+              affiliate_id: affId,
+              click_id: clickId,
+              data: {
+                name: form.get("name"),
+                phone: form.get("phone"),
+                postcode: form.get("postcode"),
+                loan_amount: Number(form.get("loan_amount"))
+              }
+            };
+
+            const response = await fetch("/api/lead", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json"
+              },
+              body: JSON.stringify(payload)
+            });
+
+            const result = await response.json();
+
+            document.getElementById("result").textContent = JSON.stringify(result, null, 2);
+
+            if (result.redirect_url) {
+              window.location.href = result.redirect_url;
+            }
+          });
+        </script>
+      </body>
+    </html>
+  `);
+});
 app.post("/api/lead", async (req, res) => {
   const { affiliate_id, click_id, data } = req.body;
 
