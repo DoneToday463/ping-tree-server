@@ -429,6 +429,49 @@ app.get("/track/click", async (req, res) => {
 
   res.redirect(redirect_url);
 });
+app.get("/admin/clicks", async (req, res) => {
+  const result = await pool.query(`
+    SELECT *
+    FROM clicks
+    ORDER BY created_at DESC
+    LIMIT 200;
+  `);
+
+  res.json(result.rows);
+});
+
+app.get("/admin/redirects", async (req, res) => {
+  const result = await pool.query(`
+    SELECT *
+    FROM redirects
+    ORDER BY created_at DESC
+    LIMIT 200;
+  `);
+
+  res.json(result.rows);
+});
+
+app.get("/admin/affiliate-report", async (req, res) => {
+  const result = await pool.query(`
+    SELECT
+      affiliates.id,
+      affiliates.name,
+      affiliates.email,
+      COUNT(DISTINCT clicks.id) AS clicks,
+      COUNT(DISTINCT redirects.id) AS redirects,
+      COUNT(DISTINCT leads.id) AS leads,
+      COUNT(DISTINCT CASE WHEN leads.status = 'accepted' THEN leads.id END) AS accepted_leads,
+      COALESCE(SUM(leads.payout), 0) AS revenue
+    FROM affiliates
+    LEFT JOIN clicks ON clicks.affiliate_id = affiliates.id::text
+    LEFT JOIN redirects ON redirects.affiliate_id = affiliates.id::text
+    LEFT JOIN leads ON leads.affiliate_id = affiliates.id::text
+    GROUP BY affiliates.id
+    ORDER BY affiliates.id DESC;
+  `);
+
+  res.json(result.rows);
+});
 app.post("/api/lead", async (req, res) => {
   const { affiliate_id, click_id, data } = req.body;
 
