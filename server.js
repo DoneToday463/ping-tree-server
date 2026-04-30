@@ -551,6 +551,86 @@ app.get("/test-form", (req, res) => {
     </html>
   `);
 });
+app.patch("/admin/offers/:id", async (req, res) => {
+  const { id } = req.params;
+  const fields = req.body;
+
+  const allowed = [
+    "name",
+    "vertical",
+    "slug",
+    "is_active",
+    "payout",
+    "landing_url"
+  ];
+
+  const updates = [];
+  const values = [];
+
+  Object.keys(fields).forEach((key) => {
+    if (allowed.includes(key)) {
+      values.push(fields[key]);
+      updates.push(`${key} = $${values.length}`);
+    }
+  });
+
+  if (updates.length === 0) {
+    return res.status(400).json({ error: "No valid fields to update" });
+  }
+
+  values.push(id);
+
+  const result = await pool.query(
+    `
+    UPDATE offers
+    SET ${updates.join(", ")}
+    WHERE id = $${values.length}
+    RETURNING *;
+    `,
+    values
+  );
+
+  res.json(result.rows[0]);
+});
+app.patch("/admin/affiliates/:id", async (req, res) => {
+  const { id } = req.params;
+  const fields = req.body;
+
+  const allowed = [
+    "name",
+    "email",
+    "api_key",
+    "is_active"
+  ];
+
+  const updates = [];
+  const values = [];
+
+  Object.keys(fields).forEach((key) => {
+    if (allowed.includes(key)) {
+      values.push(fields[key]);
+      updates.push(`${key} = $${values.length}`);
+    }
+  });
+
+  if (updates.length === 0) {
+    return res.status(400).json({ error: "No valid fields to update" });
+  }
+
+  values.push(id);
+
+  const result = await pool.query(
+    `
+    UPDATE affiliates
+    SET ${updates.join(", ")}
+    WHERE id = $${values.length}
+    RETURNING *;
+    `,
+    values
+  );
+
+  res.json(result.rows[0]);
+});
 app.post("/api/lead", async (req, res) => {
   const { affiliate_id, click_id, data } = req.body;
 
