@@ -25,6 +25,7 @@ async function initDb() {
       current_count INTEGER DEFAULT 0,
       payout NUMERIC DEFAULT 0,
       min_loan_amount NUMERIC DEFAULT 0,
+      redirect_url TEXT,
       created_at TIMESTAMP DEFAULT NOW()
     );
   `);
@@ -112,6 +113,10 @@ async function initDb() {
       created_at TIMESTAMP DEFAULT NOW()
     );
   `);
+  await pool.query(`
+  ALTER TABLE buyers
+  ADD COLUMN IF NOT EXISTS redirect_url TEXT;
+`);
   const existing = await pool.query(`SELECT COUNT(*) FROM buyers;`);
 
   if (Number(existing.rows[0].count) === 0) {
