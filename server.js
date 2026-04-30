@@ -381,6 +381,54 @@ app.post("/admin/offers", async (req, res) => {
 
   res.json(result.rows[0]);
 });
+app.get("/track/click", async (req, res) => {
+  const { aff_id, offer_id, sub1 } = req.query;
+
+  if (!aff_id || !offer_id) {
+    return res.status(400).json({ error: "Missing aff_id or offer_id" });
+  }
+
+  const click_id = `${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+
+  await pool.query(
+    `
+    INSERT INTO clicks (affiliate_id, offer_id, click_id, source, ip_address, user_agent)
+    VALUES ($1, $2, $3, $4, $5, $6);
+    `,
+    [
+      aff_id,
+      offer_id,
+      click_id,
+      sub1 || null,
+      req.ip,
+      req.headers["user-agent"]
+    ]
+  );
+
+  // get offer
+  const offer = await pool.query(
+    `SELECT * FROM offers WHERE id = $1;`,
+    [offer_id]
+  );
+
+  if (!offer.rows.length) {
+    return res.status(404).json({ error: "Offer not found" });
+  }
+
+  const landing_url = offer.rows[0].landing_url;
+
+  const redirect_url = `${landing_url}?click_id=${click_id}&aff_id=${aff_id}`;
+
+  await pool.query(
+    `
+    INSERT INTO redirects (affiliate_id, offer_id, click_id, redirect_url)
+    VALUES ($1, $2, $3, $4);
+    `,
+    [aff_id, offer_id, click_id, redirect_url]
+  );
+
+  res.redirect(redirect_url);
+});
 app.post("/api/lead", async (req, res) => {
   const { affiliate_id, data } = req.body;
 
