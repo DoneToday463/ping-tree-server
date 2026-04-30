@@ -54,7 +54,64 @@ async function initDb() {
       created_at TIMESTAMP DEFAULT NOW()
     );
   `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS affiliates (
+      id SERIAL PRIMARY KEY,
+      name TEXT NOT NULL,
+      email TEXT,
+      api_key TEXT UNIQUE,
+      is_active BOOLEAN DEFAULT true,
+      created_at TIMESTAMP DEFAULT NOW()
+    );
+  `);
 
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS offers (
+      id SERIAL PRIMARY KEY,
+      name TEXT NOT NULL,
+      vertical TEXT,
+      slug TEXT UNIQUE,
+      is_active BOOLEAN DEFAULT true,
+      payout NUMERIC DEFAULT 0,
+      landing_url TEXT,
+      created_at TIMESTAMP DEFAULT NOW()
+    );
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS affiliate_offers (
+      id SERIAL PRIMARY KEY,
+      affiliate_id INTEGER,
+      offer_id INTEGER,
+      is_active BOOLEAN DEFAULT true,
+      payout NUMERIC DEFAULT 0,
+      created_at TIMESTAMP DEFAULT NOW()
+    );
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS clicks (
+      id SERIAL PRIMARY KEY,
+      affiliate_id TEXT,
+      offer_id INTEGER,
+      click_id TEXT,
+      source TEXT,
+      ip_address TEXT,
+      user_agent TEXT,
+      created_at TIMESTAMP DEFAULT NOW()
+    );
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS redirects (
+      id SERIAL PRIMARY KEY,
+      affiliate_id TEXT,
+      offer_id INTEGER,
+      click_id TEXT,
+      redirect_url TEXT,
+      created_at TIMESTAMP DEFAULT NOW()
+    );
+  `);
   const existing = await pool.query(`SELECT COUNT(*) FROM buyers;`);
 
   if (Number(existing.rows[0].count) === 0) {
